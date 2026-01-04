@@ -36,7 +36,7 @@ OPENAI_ENDPOINT = os.getenv("OPENAI_ENDPOINT")
 OPENAI_KEY = os.getenv("OPENAI_KEY")
 EMBEDDING_DEPLOYMENT = "text-embedding-3-large"
 # Using the same deployment for chat as in reference, or default to gpt-4o/gpt-4
-CHAT_DEPLOYMENT = "gpt-4.1-795005" 
+CHAT_DEPLOYMENT = "gpt-5.2-chat" 
 
 # Azure Blob Storage
 BLOB_CONNECTION_STRING = os.getenv("BLOB_CONNECTION_STRING")
@@ -73,6 +73,34 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # ==========================================
 # HELPERS
 # ==========================================
+def preprocess_query(original_query: str) -> str:
+    """
+    Uses LLM to rewrite the user query for optimal search performance.
+    Removes conversational noise but PRESERVES all semantic details and specific terms.
+    """
+    try:
+        system_prompt = (
+            "You are an expert search query optimizer. Your task is to rewrite the user's input "
+            "into a concise, clear search query suitable for a Semantic Search engine. \n\n"
+            "**RULES:**\n"
+            "1. **REMOVE NOISE**: Strip conversational filler (e.g., 'Hello', 'Can you find', 'please').\n"
+            "2. **PRESERVE INTENT**: Keep the core meaning and specific terms (names, acronyms, dates) exactly as is.\n"
+            "3. **NO REDUNDANCY**: Do NOT add synonyms or repeated variations of the same word. Use natural phrasing.\n"
+            "4. **OUTPUT**: Return ONLY the rewritten query string."
+        )
+        
+        response = openai_client.chat.completions.create(
+            model=CHAT_DEPLOYMENT, # Uses gpt-5.2-chat
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": original_query}
+            ]
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"Pre-processing failed: {e}")
+        return original_query
+
 def get_media_sas_url(blob_name: str, media_type: str = "video") -> str:
     """Generates a read-only SAS URL for a blob, handling subfolder prefixes."""
     try:
@@ -294,23 +322,31 @@ def chat_endpoint(request: ChatRequest):
     user_query = request.message
     print(f"Received query: {user_query}")
 
-    # 1. Embed Query
-    query_vector = generate_embedding(user_query)
+    # 0. Pre-process Query
+    optimized_query = preprocess_query(user_query)
+    print(f"Optimized query: {optimized_query}")
+
+    # 1. Embed Query (using optimized query)
+    query_vector = generate_embedding(optimized_query)
 
     # 2. Search Index (Hybrid Search: Vector + Keyword)
     # Using 'universal-media-index-v1' fields: content_summary, file_id, start_time_ms, file_name, media_type
-    # We now pass 'search_text=user_query' to enable BM25 keyword search on text fields (like visible_text)
+    # We now pass 'search_text=optimized_query' to enable BM25 keyword search on text fields (like visible_text)
     # This matches the user's need to find images via OCR text.
     results = search_client.search(
-        search_text=user_query,
+        search_text=optimized_query,
         vector_queries=[
-            VectorizedQuery(vector=query_vector, k_nearest_neighbors=10, fields="content_vector")
+            VectorizedQuery(vector=query_vector, k_nearest_neighbors=50, fields="content_vector")
         ],
+        query_type="semantic",
+        semantic_configuration_name="semantic-configuration",
+        query_caption="extractive",
+        query_answer="extractive",
         select=[
             "content_summary", "file_id", "file_name", "start_time_ms", "media_type", "page_number", "chunk_source",
             "deduced_context", "visual_summary", "speech_summary", "sentiment", "visible_objects", "visible_text"
         ],
-        top=10
+        top=20
     )
 
     top_results = list(results)
@@ -322,9 +358,10 @@ def chat_endpoint(request: ChatRequest):
     print(f"\n--- AI Search Results ({len(top_results)}) ---")
     for idx, doc in enumerate(top_results):
         score = doc.get("@search.score", "N/A")
+        reranker_score = doc.get("@search.reranker_score", "N/A")
         title = doc.get("file_name", "No Title")
         content_snippet = doc.get("content_summary", "").replace("\n", " ")[:100]
-        print(f"[{idx+1}] Score: {score} | File: {title}")
+        print(f"[{idx+1}] Rank Score: {reranker_score} (Base: {score}) | File: {title}")
         print(f"    Snippet: {content_snippet}...")
     print("-------------------------------------------\n")
 
@@ -385,7 +422,7 @@ def chat_endpoint(request: ChatRequest):
         "You are a helpful CogniVault AI assistant. Your goal is to answer questions using strictly the provided context. \n\n"
         "**CRITICAL RULES:**\n"
         "1. **GREETINGS**: If the user says 'hello', greet them warmly. Do NOT cite context for greetings.\n"
-        "2. **OUT OF SCOPE**: If the answer is not in the context, say 'I cannot answer this based on the available videos.'\n"
+        "2. **OUT OF SCOPE**: If the answer is not in the context, say 'im sorry but i cannot answer questions outside my internal knowledge.'\n"
         "3. **STRICT CONTEXT**: Answer using ONLY the provided segments [[SEGMENT_X]].\n"
         "4. **CITATIONS**: Cite [[SEGMENT_X]] exactly where relevant.\n"
         "5. **FORMATTING**: Use Markdown headers, bolding for steps, and lists.\n"
@@ -402,7 +439,6 @@ def chat_endpoint(request: ChatRequest):
         completion = openai_client.chat.completions.create(
             model=CHAT_DEPLOYMENT,
             messages=messages,
-            temperature=0.0,
             response_format={ "type": "json_object" }
         )
         response_content = completion.choices[0].message.content
