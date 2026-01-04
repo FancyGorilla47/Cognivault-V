@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+gunicorn
+pydantic
+python-dotenv
+openai
+azure-search-documents
+azure-storage-blob
+azure-core
+pymupdf

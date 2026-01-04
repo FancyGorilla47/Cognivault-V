@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CogniVault</title>
+    <link rel="icon" type="image/png" href="/static/CogniVault_Mark.png">
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- PDF.js for rendering and highlighting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+
+    <style>
+        /* Modern Reset & Base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            color: #0045d0;
+            background: #f3f4f6;
+        }
+
+        /* SITE HEADER */
+        .site-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 80px;
+            padding: 0 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 100;
+            background: #fff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            font-size: 0.95rem;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .nav-item {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: color 0.2s;
+        }
+
+        .nav-item:hover {
+            color: #0045d0;
+        }
+
+        .badge-ai {
+            background: #333;
+            color: #fff;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .btn-contact {
+            background-color: #0045d0;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-contact:hover {
+            background-color: #0033a0;
+        }
+
+        .icon-btn {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            color: #555;
+        }
+
+        /* MAIN LAYOUT */
+        #main-layout {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            width: 100%;
+            position: relative;
+            z-index: 10;
+            transition: all 0.6s ease;
+            margin-top: 0;
+            padding-top: 80px;
+            justify-content: center;
+            align-items: stretch;
+        }
+
+        /* CHAT CONTAINER */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(0, 0, 0, 0.04);
+            margin: 20px;
+            margin-right: 10px;
+            animation: containerFadeIn 1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            transition: all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        @keyframes containerFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .chat-container.landing-mode {
+            justify-content: center;
+            align-items: center;
+            background: transparent;
+            box-shadow: none;
+            border: none;
+            max-width: 900px;
+            margin: 40px auto;
+            height: calc(100% - 80px);
+        }
+
+        /* MESSAGES */
+        .messages-area {
+            flex: 1;
+            padding: 20px 40px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            background: transparent;
+        }
+
+        .message-row {
+            display: flex;
+            align-items: flex-end;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+
+        .message-row.bot {
+            justify-content: flex-start;
+        }
+
+        .message-row.user {
+            justify-content: flex-end;
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 10px;
+            flex-shrink: 0;
+            background: #eee;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 16px 24px;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            position: relative;
+            animation: messagePopIn 0.3s ease forwards;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .message.bot {
+            background: #f0f2f5;
+            color: #1a1a1a;
+            border-bottom-left-radius: 2px;
+        }
+
+        .message.user {
+            background: #2563eb;
+            color: #ffffff;
+            border-bottom-right-radius: 2px;
+        }
+
+        .message.bot a {
+            color: #2563eb;
+        }
+
+        .message.user a {
+            color: #fff;
+            text-decoration: underline;
+        }
+
+        .message p {
+            margin-bottom: 4px;
+        }
+
+        .message .msg-header {
+            margin-top: 16px;
+            margin-bottom: 4px;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .message ul,
+        .message ol {
+            margin-bottom: 8px;
+            padding-left: 20px;
+        }
+
+        @keyframes messagePopIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* INPUT AREA */
+        .input-area {
+            padding: 20px 40px;
+            background: transparent;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .chat-container.landing-mode .input-area {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 50px;
+            width: 100%;
+            max-width: 800px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            padding: 10px 20px;
+        }
+
+        .input-field {
+            flex: 1;
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            padding: 14px 24px;
+            border-radius: 30px;
+            color: #333;
+            outline: none;
+            transition: all 0.3s ease;
+            resize: none;
+            overflow-y: hidden;
+            height: 52px;
+            line-height: 1.5;
+            font-size: 1rem;
+        }
+
+        .chat-container.landing-mode .input-field {
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            font-size: 1rem;
+        }
+
+        .input-field:focus {
+            background: #fff;
+            border-color: #49a7e8;
+            box-shadow: 0 0 0 3px rgba(73, 167, 232, 0.1);
+        }
+
+        .send-btn {
+            background-color: #0045d0;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .send-btn:hover {
+            background-color: #0033a0;
+            transform: scale(1.05);
+        }
+
+        .send-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: #fff;
+            margin-left: 2px;
+        }
+
+        /* UNIFIED MEDIA PANEL (Replaces Video Container) */
+        .media-container {
+            width: 0;
+            opacity: 0;
+            overflow: hidden;
+            background: transparent;
+            border-radius: 0;
+            display: flex;
+            flex-direction: column;
+            transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease 0.1s;
+        }
+
+        .media-container.active {
+            width: 55%;
+            min-width: 400px;
+            opacity: 1;
+            margin-left: 20px;
+        }
+
+        /* Split view logic updates */
+        #main-layout.split-view .chat-container {
+            flex: none;
+            width: 50%;
+            margin: 0;
+        }
+
+        #main-layout.split-view .media-container {
+            width: 50%;
+            opacity: 1;
+            margin: 0;
+            display: flex;
+        }
+
+        .media-header {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .close-media-btn {
+            background: transparent;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            font-size: 1.5rem;
+            transition: color 0.3s;
+        }
+
+        .close-media-btn:hover {
+            color: #0045d0;
+        }
+
+        .media-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            background: #000;
+            /* Dark background for media */
+            border-radius: 12px;
+            margin: 0 20px 20px 20px;
+            overflow: auto;
+            /* Scroll if content (PDF) is tall */
+        }
+
+        /* Media Specifics */
+        .media-content video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .media-content img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* PDF specific container to hold canvas + highlight overlay */
+        #pdfWrapper {
+            position: relative;
+            display: inline-block;
+            /* Wraps canvas tightly */
+            width: auto;
+            height: auto;
+        }
+
+        .highlight-box {
+            position: absolute;
+            background-color: rgba(255, 255, 0, 0.3);
+            border: 2px solid rgba(255, 255, 0, 0.8);
+            z-index: 10;
+            cursor: pointer;
+        }
+
+        /* HERO SECTION */
+        .hero-section {
+            max-width: 800px;
+            width: 90%;
+            margin-bottom: 40px;
+            padding: 0 20px;
+            text-align: center;
+            color: #0045d0;
+            animation: fadeIn 0.8s ease;
+        }
+
+        .hero-section h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+            color: #0d3e69;
+        }
+
+        .hero-section p {
+            font-size: 1rem;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        /* REFERENCES FOOTER */
+        .sources-footer {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #eee;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 0.85rem;
+        }
+
+        .source-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .source-group strong {
+            color: #555;
+            min-width: 60px;
+        }
+
+        .ref-btn {
+            background: #eef2ff;
+            color: #0045d0;
+            border: 1px solid #c7d2fe;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ref-btn:hover {
+            background: #0045d0;
+            color: #fff;
+            border-color: #0045d0;
+        }
+
+        /* FOOTER */
+        .site-footer {
+            position: relative;
+            background: #fff;
+            padding: 10px 40px;
+            z-index: 100;
+            font-size: 0.8rem;
+            color: #666;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+            width: 100%;
+            flex-shrink: 0;
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .footer-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .footer-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 10px;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 20px;
+        }
+
+        .footer-link {
+            cursor: pointer;
+            color: #6b7280;
+            text-decoration: none;
+        }
+
+        .social-icons {
+            display: flex;
+            gap: 15px;
+            color: #6b7280;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- SITE HEADER -->
+    <header class="site-header">
+        <div class="header-left">
+            <img src="/static/Cognivault_Logo.png" alt="CogniVault Logo"
+                style="height: 40px; width: auto; object-fit: contain; margin-right: 30px;">
+            <div class="nav-links">
+                <div class="nav-item">Product <span class="badge-ai">AI</span></div>
+                <div class="nav-item">Solutions</div>
+                <div class="nav-item">Customers</div>
+            </div>
+        </div>
+        <div class="header-right header-actions">
+            <div class="icon-btn">EN</div>
+            <div class="nav-item">Login</div>
+            <button class="btn-contact">Contact sales</button>
+        </div>
+    </header>
+
+    <div id="main-layout">
+        <!-- CHAT SECTION -->
+        <div class="chat-container landing-mode" id="chatContainer">
+
+            <!-- HERO -->
+            <div class="hero-section" id="heroSection">
+                <h1>AI Intelligence Knowledge Mining</h1>
+                <p>Type your query. AI can find answers from your video, images and document library.</p>
+            </div>
+
+            <!-- MESSAGES -->
+            <div class="chat-header-inner" id="chatHeader" style="display: none; opacity: 0;"></div>
+            <div class="messages-area" id="messagesArea" style="display: none; opacity: 0;"></div>
+
+            <!-- INPUT -->
+            <div class="input-area landing-mode" id="inputArea">
+                <textarea class="input-field" placeholder="Ask a query to get AI based content search..." id="userInput"
+                    rows="1" oninput="autoResize(this)" onkeydown="handleEnter(event)"></textarea>
+                <button class="send-btn" onclick="sendMessage()">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- UNIFIED MEDIA PANEL -->
+        <div class="media-container" id="mediaContainer">
+            <div class="media-header">
+                <h3 style="margin: 0; color: #0045d0;" id="mediaTitle">Preview</h3>
+                <button class="close-media-btn" onclick="closeMediaPanel()">&times;</button>
+            </div>
+            <div class="media-content" id="mediaContent">
+                <!-- Dynamic Content Injected Here -->
+                <div style="color: #666;">Select a source to view</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SITE FOOTER -->
+    <footer class="site-footer">
+        <div class="footer-top">
+            <div></div>
+            <div class="social-icons">
+                <!-- Simple icons -->
+                <span>Twitter</span> <span>LinkedIn</span> <span>YouTube</span>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <div class="footer-links">
+                <a href="#" class="footer-link">Privacy policy</a>
+                <a href="#" class="footer-link">Terms of service</a>
+            </div>
+            <div class="copyright">Copyright © 2024. All Rights Reserved.</div>
+        </div>
+    </footer>
+
+    <script>
+        const messagesArea = document.getElementById('messagesArea');
+        const userInput = document.getElementById('userInput');
+        const mediaContainer = document.getElementById('mediaContainer');
+        const mediaContent = document.getElementById('mediaContent');
+        const mediaTitle = document.getElementById('mediaTitle');
+
+        const chatContainer = document.getElementById('chatContainer');
+        const heroSection = document.getElementById('heroSection');
+        const chatHeader = document.getElementById('chatHeader');
+        const inputArea = document.getElementById('inputArea');
+
+        let isLandingMode = true;
+
+        // --- CORE UI LOGIC ---
+
+        function handleEnter(e) {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        }
+
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+            el.style.overflowY = el.scrollHeight > 150 ? 'auto' : 'hidden';
+        }
+
+        function transitionToChatMode() {
+            if (!isLandingMode) return;
+            isLandingMode = false;
+            chatContainer.classList.remove('landing-mode');
+            inputArea.classList.remove('landing-mode');
+            heroSection.style.display = 'none';
+            chatHeader.style.display = 'flex';
+            messagesArea.style.display = 'flex';
+
+            setTimeout(() => {
+                chatHeader.style.opacity = 1;
+                messagesArea.style.opacity = 1;
+            }, 50);
+
+            if (messagesArea.children.length === 0) {
+                addMessage("Welcome to CogniVault. I am your AI DAM Assistant.", "bot");
+            }
+        }
+
+        function openMediaPanel() {
+            const layout = document.getElementById('main-layout');
+            if (!mediaContainer.classList.contains('active')) {
+                mediaContainer.classList.add('active');
+                layout.classList.add('split-view');
+            }
+        }
+
+        function closeMediaPanel() {
+            const layout = document.getElementById('main-layout');
+            mediaContainer.classList.remove('active');
+            layout.classList.remove('split-view');
+
+            // Allow animation to finish before clearing, but pause video immediately
+            const video = mediaContent.querySelector('video');
+            if (video) video.pause();
+
+            setTimeout(() => {
+                mediaContent.innerHTML = ''; // Clear content
+            }, 500);
+        }
+
+        // --- MEDIA VIEWERS ---
+
+        // 1. VIDEO
+        window.playRefVideo = function (url, startTime) {
+            transitionToChatMode(); // Ensure we are in chat mode if clicked
+            openMediaPanel();
+            mediaTitle.innerText = "Video Preview";
+
+            mediaContent.innerHTML = '';
+            const video = document.createElement('video');
+            video.src = url;
+            video.controls = true;
+            video.currentTime = startTime;
+            video.style.width = "100%";
+            video.style.height = "100%";
+            video.autoplay = true;
+
+            mediaContent.appendChild(video);
+        };
+
+        // 2. IMAGE
+        window.showImage = function (url, title) {
+            transitionToChatMode();
+            openMediaPanel();
+            mediaTitle.innerText = title || "Image Preview";
+
+            mediaContent.innerHTML = '';
+            const img = document.createElement('img');
+            img.src = url;
+            mediaContent.appendChild(img);
+        }
+
+        // 3. PDF with Highlighting
+        // 3. PDF with Highlighting (Server-Side)
+        window.showPdf = async function (url, pageNumber, chunkSource) {
+            transitionToChatMode();
+            openMediaPanel();
+            mediaTitle.innerText = `PDF Preview`;
+            mediaContent.innerHTML = '<div style="color:white;">Loading PDF...</div>';
+
+            try {
+                let blobPath = "";
+                try {
+                    const urlObj = new URL(url);
+                    // URL: .../container/folder/file.pdf
+                    const pathParts = urlObj.pathname.split('/');
+                    // parts[0]="", parts[1]="container", parts[2+]="folder/file"
+                    blobPath = pathParts.slice(2).join('/');
+                    blobPath = decodeURIComponent(blobPath);
+                } catch (e) {
+                    console.error("Path extraction error", e);
+                }
+
+                if (!blobPath) {
+                    mediaContent.innerHTML = '<div style="color:red; p:20px;">Error parsing PDF path.</div>';
+                    return;
+                }
+
+                // Construct Server View URL
+                // The server will handle highlighting and return a stream
+                // We append #page=N so the browser's native viewer jumps to the page.
+                const viewUrl = `/view_pdf?blob_name=${encodeURIComponent(blobPath)}` +
+                    (chunkSource ? `&chunk_source=${encodeURIComponent(chunkSource)}` : "") +
+                    (pageNumber ? `#page=${pageNumber}` : "");
+
+                console.log("Opening Native View:", viewUrl);
+
+                // Use simple Iframe
+                mediaContent.innerHTML = `
+                    <iframe src="${viewUrl}" 
+                            style="width:100%; height:100%; border:none; background: white;" 
+                            title="PDF Viewer">
+                    </iframe>`;
+
+            } catch (error) {
+                console.error("PDF UI Error:", error);
+                mediaContent.innerHTML = `<div style="color:red; padding:20px;">Error loading PDF.<br>${error.message}</div>`;
+            }
+        };
+
+
+        // --- CHAT LOGIC ---
+
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            if (isLandingMode) transitionToChatMode();
+
+            addMessage(text, 'user');
+            userInput.value = '';
+            userInput.style.height = '52px';
+
+            const loadingId = addMessage("Thinking...", 'bot', true);
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+
+                const data = await response.json();
+                removeMessage(loadingId);
+
+                if (data.answer) addMessage(data.answer, 'bot');
+
+                // Generic Auto-Open Logic
+                if (data.auto_open) {
+                    const media = data.auto_open;
+                    if (media.type === 'video') {
+                        playRefVideo(media.url, media.start_time);
+                    } else if (media.type === 'image') {
+                        showImage(media.url, media.title);
+                    } else if (media.type === 'pdf') {
+                        showPdf(media.url, media.page, media.chunk_source);
+                    }
+                }
+
+            } catch (error) {
+                console.error("Error:", error);
+                removeMessage(loadingId);
+                addMessage("Sorry, I encountered an error connecting to the server.", 'bot');
+            }
+        }
+
+        function addMessage(text, sender, isLoading = false) {
+            const rowDiv = document.createElement('div');
+            rowDiv.classList.add('message-row', sender);
+
+            const avatarDiv = document.createElement('div');
+            avatarDiv.classList.add('avatar');
+
+            // Scalable SVGs
+            if (sender === 'bot') {
+                avatarDiv.innerHTML = `<svg viewBox="0 0 24 24" fill="#4b5563" style="width:24px;height:24px;"><path d="M12 2C13.1 2 14 2.9 14 4V4H19C20.1 4 21 4.9 21 6V18C21 19.1 20.1 20 19 20H5C3.9 20 3 19.1 3 18V6C3 4.9 3.9 4 5 4H10V4C10 2.9 10.9 2 12 2M7.5 13.5C7.5 14.33 8.17 15 9 15C9.83 15 10.5 14.33 10.5 13.5C10.5 12.67 9.83 12 9 12C8.17 12 7.5 12.67 7.5 13.5M13.5 13.5C13.5 14.33 14.17 15 15 15C15.83 15 16.5 14.33 16.5 13.5C16.5 12.67 15.83 12 15 12C14.17 12 13.5 12.67 13.5 13.5Z"/></svg>`;
+            } else {
+                avatarDiv.innerHTML = `<svg viewBox="0 0 24 24" fill="#2563eb" style="width:24px;height:24px;"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`;
+            }
+
+            const msgDiv = document.createElement('div');
+            msgDiv.classList.add('message', sender);
+
+            let formattedText = text;
+            formattedText = formattedText.replace(/###\s*(.+)/g, '<h3 class="msg-header">$1</h3>');
+            formattedText = formattedText.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            formattedText = formattedText.replace(/\n/g, '<br>');
+            formattedText = formattedText.replace(/<\/h3>\s*(?:<br>\s*)+/g, '</h3>');
+
+            msgDiv.innerHTML = formattedText;
+            if (isLoading) { msgDiv.style.opacity = '0.7'; msgDiv.textContent = "Processing..."; msgDiv.id = 'loading-' + Date.now(); }
+
+            if (sender === 'bot') { rowDiv.appendChild(avatarDiv); rowDiv.appendChild(msgDiv); }
+            else { rowDiv.appendChild(msgDiv); rowDiv.appendChild(avatarDiv); }
+
+            messagesArea.appendChild(rowDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+            return msgDiv.id;
+        }
+
+        function removeMessage(id) {
+            const el = document.getElementById(id);
+            if (el) el.closest('.message-row').remove();
+        }
+    </script>
+</body>
+
+</html>

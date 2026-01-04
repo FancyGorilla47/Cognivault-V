@@ -1,0 +1,8 @@
+*
+!main.py
+!chat_interface.html
+!static/
+!static/*
+!requirements.txt
+!startup.sh
+!.gitignore
